@@ -130,3 +130,4 @@ dmypy.json
 
 /train_model_pyspark.csv
 *csv
+*gzip

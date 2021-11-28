@@ -1,8 +1,35 @@
 from pyspark.sql import SparkSession, Window, DataFrame
 from pyspark.sql import functions as F
+import boto3
+import botocore
+
 from os import getenv
 
 DATE_FORMAT = "yyyy-MM-dd"
+BUCKET_NAME = 'kueski-ml-system' 
+RISK_DATASET_KEY = 'raw_data/2021/11/27/dataset_credit_risk.csv'
+FEATURES_KEY = 'feature_store/2021/11/28/train_model_pyspark.parquet.gzip'
+DATASET = "dataset_credit_risk.csv"
+FEATURE = "train_model_pyspark.parquet.gzip"
+
+def download_file(bucket_name: str, file_key: str, file_local: str):
+    s3 = boto3.resource('s3')
+    try:
+        s3.Bucket(bucket_name).download_file(file_key, file_local)
+    except botocore.exceptions.ClientError as e:
+        if e.response['Error']['Code'] == "404":
+            print("The object does not exist.")
+        else:
+            raise
+
+def upload_file(bucket_name: str, file_key: str, file_local: str):
+    # Upload the file
+    s3_client = boto3.client('s3')
+    try:
+        s3_client.upload_file(file_local, bucket_name, file_key)
+    except botocore.exceptions.ClientError as e:
+        print(f"Error: {e}")
+        raise
 
 dev: bool = True if getenv("STAGE", None) == "dev" else False
 if dev:
@@ -11,19 +38,16 @@ if dev:
         .appName("Feature Engineering")
         .getOrCreate()
     )
-    DATASET_PATH = "dataset_credit_risk.csv"
-    FEATURE_PATH = "train_model_pyspark.csv"
 else:
     spark = SparkSession.builder.appName("Feature Engineering").getOrCreate()
-    DATASET_PATH = "s3a://kueski-ml-system/raw_data/2021/11/27/dataset_credit_risk.csv"
-    FEATURE_PATH = "train_model_pyspark.csv"
+    download_file(BUCKET_NAME, RISK_DATASET_KEY, DATASET)
 Logger = spark._jvm.org.apache.log4j.Logger
 logger = Logger.getLogger(__name__)
-spark.sparkContext.setLogLevel("INFO")
+# spark.sparkContext.setLogLevel("warn")
 
 
 def data_formatting(df: DataFrame) -> DataFrame:
-    logger.info("FORMATTING DATAFRAME AND ORDERING")
+    logger.warn("FORMATTING DATAFRAME AND ORDERING")
     df = df.withColumn("loan_date", F.to_date("loan_date", DATE_FORMAT))
     df = df.withColumn("birthday", F.to_date("birthday", DATE_FORMAT))
     df = df.withColumn("job_start_date", F.to_date("job_start_date", DATE_FORMAT))
@@ -31,7 +55,7 @@ def data_formatting(df: DataFrame) -> DataFrame:
 
 
 def feature_pipeline(df: DataFrame) -> DataFrame:
-    logger.info("CREATING FEATURES")
+    logger.warn("CREATING FEATURES")
     w_avg = (
         Window.partitionBy("id")
         .orderBy(F.asc("loan_date"))
@@ -65,8 +89,8 @@ def feature_pipeline(df: DataFrame) -> DataFrame:
 
 
 if __name__ == "__main__":
-    logger.info(f"READING CSV FROM {DATASET_PATH}")
-    df = spark.read.option("header", True).option("inferSchema", True).csv(DATASET_PATH)
+    logger.warn(f"READING CSV FROM {DATASET}")
+    df = spark.read.option("header", True).option("inferSchema", True).csv(DATASET)
     df = data_formatting(df)
     df = feature_pipeline(df)
 
@@ -84,5 +108,8 @@ if __name__ == "__main__":
     df.printSchema()
 
 
-    logger.info(f"WRITING CSV TO {FEATURE_PATH}")
-    df.write.option("header", True).csv(FEATURE_PATH)
+    logger.warn(f"WRITING CSV TO {FEATURE}")
+    df.toPandas().to_parquet(FEATURE, compression='gzip')
+    if not dev:
+        logger.warn(f"UPLOADING FILE TO S3 {BUCKET_NAME}/{FEATURES_KEY}")
+        upload_file(BUCKET_NAME, FEATURES_KEY, FEATURE)

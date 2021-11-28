@@ -3,7 +3,7 @@ name: Upload PySpark Code
 on:
   push:
     branches:
-      - master
+      - main
 
 jobs:
   deploy:

@@ -2,6 +2,7 @@ from pyspark.sql import SparkSession, Window, DataFrame
 from pyspark.sql import functions as F
 import boto3
 import botocore
+import pandas as pd
 
 from os import getenv
 
@@ -96,6 +97,7 @@ if __name__ == "__main__":
 
     df = df.select(
         "id",
+        "loan_date",
         "age",
         "years_on_the_job",
         "nb_previous_loans",
@@ -109,7 +111,9 @@ if __name__ == "__main__":
 
 
     logger.warn(f"WRITING CSV TO {FEATURE}")
-    df.toPandas().to_parquet(FEATURE, compression='gzip')
+    pandas_df = df.toPandas()
+    pandas_df["loan_date"] = pd.to_datetime(pandas_df["loan_date"])
+    pandas_df.to_parquet(FEATURE, compression='gzip')
     if not dev:
         logger.warn(f"UPLOADING FILE TO S3 {BUCKET_NAME}/{FEATURES_KEY}")
         upload_file(BUCKET_NAME, FEATURES_KEY, FEATURE)

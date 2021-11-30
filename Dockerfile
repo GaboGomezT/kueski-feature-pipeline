@@ -1,13 +1,11 @@
-ARG IMAGE_VARIANT=buster
-ARG OPENJDK_VERSION=8
-ARG PYTHON_VERSION=3.9.8
-
-FROM python:${PYTHON_VERSION}-${IMAGE_VARIANT} AS py3
-FROM openjdk:${OPENJDK_VERSION}-${IMAGE_VARIANT}
+FROM python:3.9.8-buster AS py3
+FROM openjdk:8-buster
 
 COPY --from=py3 / /
+
+COPY main.py /src/main.py
 COPY requirements.txt requirements.txt
-ENV STAGE=dev
+ENV STAGE=prod
 
 ARG PYSPARK_VERSION=3.2.0
 RUN pip --no-cache-dir install pyspark==${PYSPARK_VERSION}
@@ -19,3 +17,5 @@ RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2
 RUN unzip awscliv2.zip
 RUN ./aws/install
 WORKDIR /src
+
+CMD ["python", "main.py"]

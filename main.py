@@ -7,11 +7,11 @@ import pandas as pd
 from os import getenv
 
 DATE_FORMAT = "yyyy-MM-dd"
-BUCKET_NAME = 'kueski-ml-system' 
-RISK_DATASET_KEY = 'raw_data/2021/11/27/dataset_credit_risk.csv'
-FEATURES_KEY = 'feature_store/2021/11/28/train_model_pyspark.parquet.gzip'
-DATASET = "dataset_credit_risk.csv"
-FEATURE = "train_model_pyspark.parquet.gzip"
+BUCKET_NAME = getenv("BUCKET_NAME")
+RISK_DATASET_KEY = getenv("RISK_DATASET_KEY")
+FEATURES_KEY = getenv("FEATURES_KEY")
+DATASET = getenv("DATASET")
+FEATURE = getenv("FEATURE")
 
 def download_file(bucket_name: str, file_key: str, file_local: str):
     s3 = boto3.resource('s3')
